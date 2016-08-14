@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-author: Lithin T
+author: Jamshid K
 website: orchidinfosys.com 
 last edited: October 2015
 """
@@ -24,14 +24,14 @@ class PizzaAttendance(QtGui.QMainWindow):
     def get_outlets(self):
         username = 'admin' #the user
         pwd = 'fslhggihgvplkhgvpdl'      #the password of the user
-        dbname = 'yas_test'    #the database
+        dbname = 'yas_live'    #the database
 
         # Get the uid
-        sock_common = xmlrpclib.ServerProxy ('http://128.199.148.185:9069/xmlrpc/common')
+        sock_common = xmlrpclib.ServerProxy ('http://localhost:8069/xmlrpc/common')
         uid = sock_common.login(dbname, username, pwd)
 
         #replace localhost with the address of the server
-        sock = xmlrpclib.ServerProxy('http://128.199.148.185:9069/xmlrpc/object')
+        sock = xmlrpclib.ServerProxy('http://localhost:8069/xmlrpc/object')
 
 
         args = [] #query clause
@@ -39,6 +39,7 @@ class PizzaAttendance(QtGui.QMainWindow):
 
         fields = ['name','name'] #fields to read
         data = sock.execute(dbname, uid, pwd, 'pos.config', 'read', ids, fields) #ids is a list of id
+        print "outlet data>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>",data
         return data
         
 
@@ -57,9 +58,9 @@ class PizzaAttendance(QtGui.QMainWindow):
         i = 0
         for outlet in self.get_outlets():
             if i == 0:
-                inital_message = outlet.get('name')
+                inital_message = outlet.get('name') + '/' +str(outlet.get('id'))
             i =i+1
-            combo.addItem(outlet.get('name'))
+            combo.addItem(outlet.get('name') + '/' +str(outlet.get('id')))
         combo.move(50, 50)
         combo.activated[str].connect(self.onActivated)   
         
@@ -116,29 +117,29 @@ class PizzaAttendance(QtGui.QMainWindow):
         self.lcd.display(strftime("%H"+":"+"%M"+":"+"%S"))
 
 
-    def process_attendance(self,employee_id):
-        username = 'orchid' #the user
-        pwd = 'piza123'      #the password of the user
-        dbname = 'pizza_test'    #the database
+    def process_attendance(self,employee_id,outlet_id):
+        username = 'admin' #the user
+        pwd = 'fslhggihgvplkhgvpdl'      #the password of the user
+        dbname = 'yas_live'    #the database
         action = 'sign_in'
 
         # Get the uid
-        sock_common = xmlrpclib.ServerProxy ('http://128.199.148.185:9069/xmlrpc/common')
+        sock_common = xmlrpclib.ServerProxy ('http://localhost:8069/xmlrpc/common')
         uid = sock_common.login(dbname, username, pwd)
 
         #replace localhost with the address of the server
-        sock = xmlrpclib.ServerProxy('http://128.199.148.185:9069/xmlrpc/object')
+        sock = xmlrpclib.ServerProxy('http://localhost:8069/xmlrpc/object')
 
         args = [('employee_id','=',employee_id)] #query clause
         ids = sock.execute(dbname, uid, pwd, 'hr.attendance', 'search', args)
         fields = ['action'] #fields to read
         data = sock.execute(dbname, uid, pwd, 'hr.attendance', 'read', ids, fields)
         if not data:
-            self.onActivated("Invalid")
+            self.onActivated(".....")
             action = 'sign_in'
         else:
             print "DDDDDD",data
-            c = data[0][1]['action']
+            c = data[0]['action']
             if c == 'sign_in':
                 action = 'sign_out'
             else:
@@ -150,6 +151,7 @@ class PizzaAttendance(QtGui.QMainWindow):
 
         attendance_data = {
            'employee_id': employee_id,
+           'od_outlet_id':outlet_id,
            'action': action,
         }
 
@@ -157,7 +159,7 @@ class PizzaAttendance(QtGui.QMainWindow):
 
 
     # create a Processor
-    def scann_barcode(self):
+    def scann_barcode(self,outlet_id):
 
         proc = zbar.Processor()
         # configure the Processor
@@ -179,8 +181,12 @@ class PizzaAttendance(QtGui.QMainWindow):
         for symbol in proc.results:
             # do something useful with results
             print 'decoded', symbol.type, 'symbol', '"%s"' % symbol.data
-            employee_id = int(symbol.data)
-            self.process_attendance(employee_id)
+            data_val=symbol.data
+            data_list = data_val.split('-')
+            
+            employee_id = int(data_list[0])
+            print "employee_id>>>>>>>>>>>>>>>>>>>>>>>",employee_id
+            self.process_attendance(employee_id,outlet_id)
 #            try:
 #                employee_id = int(symbol.data)
 #                self.process_attendance(employee_id)
@@ -195,7 +201,13 @@ class PizzaAttendance(QtGui.QMainWindow):
      
         sender = self.sender()
         self.statusBar().showMessage(sender.text() + ' was pressed')
-        self.scann_barcode()
+        print "combo>>>>>>>>>>>>>>>>>>",self.status_message.text()
+        outlet_name = str(self.status_message.text())
+       
+        name_id = outlet_name.split('/')
+        outlet_id = name_id[1]
+        
+        self.scann_barcode(int(outlet_id))
 
 #        if sender.text() == 'SignIN':
 #            self.scann_barcode('sign_in')
